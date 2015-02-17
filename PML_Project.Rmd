@@ -1,7 +1,34 @@
-# Machine Learning Project Feb 2015
-output: html_document
----
-# Load training and testing data and replace all missing values with "NA"
+# Practical Machine Learning Course Project
+
+Ken Cheng
+
+Feb 17, 2015
+
+## Background
+
+In this project, the goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants and predict the manner in which they did the exercise. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset). 
+
+##Data 
+
+The training data for this project are available here: 
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here: 
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har.  
+
+##Instructions on what to submit for the project
+
+The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases. 
+
+1. Your submission should consist of a link to a Github repo with your R markdown and compiled HTML file describing your analysis. Please constrain the text of the writeup to < 2000 words and the number of figures to be less than 5. It will make it easier for the graders if you submit a repo with a gh-pages branch so the HTML page can be viewed online.
+
+2. You should also apply your machine learning algorithm to the 20 test cases available in the test data above. Submit your predictions in appropriate format to the programming assignment for automated grading. See the programming assignment for additional details. 
+
+**Load training and testing data and replace all missing values with "NA"**
 ```{r}
 pml.training <- read.csv("~/desktop/coursera/Machine_Learning/pml-training.csv", 
                          na.strings=c("NA", "#DIV/O!", ""))
@@ -9,94 +36,109 @@ pml.testing <- read.csv("~/desktop/coursera/Machine_Learning/pml-testing.csv",
                         na.strings=c("NA", "#DIV/O!", ""))
 ```
 
-# Remove the first 7 variables (column 1 to 7) which are not predictor variables
+**Remove the first 7 variables (column 1 to 7) which are not predictor variables**
 ```{r}
 pml.training <- pml.training[,-c(1:7)]
 pml.testing  <- pml.testing[, -c(1:7)]
 ```
 
-# Identify and remove columns with missing values
+**Identify and remove columns with missing values**
 ```{r}
-# index_columns <- colnames(pml.training[colSums(is.na(pml.training)) == 0])
-# pml.training <- pml.training[, index_columns]
-# pml.testing  <- pml.testing[, index_columns]
-
 pml.training <- pml.training[, colSums(is.na(pml.training)) == 0]
 pml.testing  <- pml.testing[, colSums(is.na(pml.testing))  == 0]
 ```
-# Load packages and partition training data subset for cross-validation
-```{r}
+**Load packages**
+```{r results='hide'}
 library(caret)
 library(randomForest)
 library(gbm)
-library(plyr)
+```
+**Partition pml.training data for training and cross-validation**
+```{r}
 set.seed(1234)
 inTrain <- createDataPartition(y=pml.training$classe, p=0.75, list=FALSE)
 trainingsub <- pml.training[inTrain, ]
 testingsub <- pml.training[-inTrain, ]
 ```
 
-# Prediction Model Using Decision Tree : modelDT
-```{r}
+**Use and compare 4 different models learned in class: Decision Tree, Random Forest, Boosting and K-Nearest Neighborhood**
+
+Prediction Model Using Decision Tree : modelDT
+```{r results='hide'}
 modelDT <- train(classe ~., data=trainingsub, method = "rpart")
 predDT  <- predict(modelDT, testingsub)
 cmDT    <- confusionMatrix(predDT, data=testingsub$classe)
+```
+The confusion matrix for Decision Tree Model
+```{r echo=FALSE}
 cmDT
 ```
-
-# Prediction Model Using Random Forest : modelRF
-```{r}
+Prediction Model Using Random Forest : modelRF
+```{r results='hide'}
 cvCtrl <- trainControl(method="cv", number = 4, 
                        allowParallel=TRUE, verboseIter=TRUE)
 modelRF <- train(classe ~., data=trainingsub, method = "rf", trControl = cvCtrl)
-# modelRF <- randomForest(classe ~. , data=trainingsub, method="class")
 predRF  <- predict(modelRF, testingsub)
 cmRF    <- confusionMatrix(predRF, data=testingsub$classe)
+```
+The confusion matrix for Random Tree Model
+```{r echo=FALSE}
 cmRF
 ```
-
-# Prediction Model Using Boosting : modelBoost
-```{r}
+Prediction Model Using Boosting : modelBoost
+```{r results='hide'}
 modelBoost <- train(classe ~., data=trainingsub, method = "gbm")
 predBoost  <- predict(modelBoost, testingsub)
 cmBoost    <- confusionMatrix(predBoost, data=testingsub$classe)
+```
+The confusion matrix for Boosting Model
+```{r echo=FALSE}
 cmBoost
 ```
-
-# Prediction Model Using K-Nearest Neighbor : modelKNN
-```{r}
+Prediction Model Using K-Nearest Neighbor : modelKNN
+```{r results='hide'}
 modelKNN <- train(classe ~., data=trainingsub, method = "knn", trControl=cvCtrl)
 predKNN  <- predict(modelKNN, testingsub)
 cmKNN    <- confusionMatrix(predKNN, data=testingsub$classe)
+```
+Confusion Matrix for K-Nearest Neighbor Model
+```{r echo=FALSE}
 cmKNN
 ```
-```{r}
+**Extract and compare accuracy of each model on the training data subset**
+```{r results='hide'}
 accuracytab <- data.frame(Model=c("Decision Tree", "Random Forest", "Boosting", "KNN"),
                       Accuracy=c(round(max(head(modelDT$results)$Accuracy),3),
                                  round(max(head(modelRF$results)$Accuracy),3),
                                  round(max(head(modelBoost$results)$Accuracy),3),
                                  round(max(head(modelKNN$results)$Accuracy), 3)))
+
 ```
-# Show the accuracy of the four models and select model with highest accuracy
-```{r}
-accuracytab
+The table below summarizes the accuracy of the 4 models applied on the training data subset. The Random Forest model has the highest accuracy at 0.991 and out-of-sample error at 0.009. The Decision Tree model shows the lowest accuracy at 0.521 and out-of-sample error at 0.479. The next step would be to compare how well these models perform in the cross validation using the testing data subset.
+```{r echo=FALSE}
+accuracytab 
 ```
-# Extract and compare the accuracy of prediction by each model on the testing subset
-```{r}
+**Extract and compare accuracy of prediction by each model on the testing data subset**
+```{r results='hide'}
 accuracypred <- data.frame(Model=c("Decision Tree", "Random Forest", "Boosting", "KNN"),
                       Accuracy=c(round((cmDT$overall)[1],3),
                                  round((cmRF$overall)[1],3),
                                  round((cmBoost$overall)[1],3),
                                  round((cmKNN$overall)[1], 3)))
+```
+
+The table below summarizes the 4 models used for cross-validation using the test data subset and shows that Random Forest provides the best prediction with Accuracy of 0.994 and thus out-of-sample error is equal to 0.006 while the Decision Tree model had the lowest prediction Accuracy at 0.495 and highest out-of-sample error at 0.505. Hence the Random Forest model was selected as the final model and applied on test quiz data for our prediction submission.   
+```{r echo=FALSE}
 accuracypred
 ```
-# Apply models on the test quiz data
+The table below summarizes the predictions using our final model (Random Forest) on the test quiz data. As a comparison, the next two best models (Boosting and KNN) based on cross-validation results were also used on the test quiz data. Interestingly, the predictions using the Random Forest, Boosting and KNN gave identical results. The identical prediction results were not surprising as these models had quite similar Accuracy in the cross-validation predictions.  
 ```{r}
 test.rf    <- predict(modelRF, pml.testing)
 test.boost <- predict(modelBoost, pml.testing)
 test.knn   <- predict(modelKNN, pml.testing)
 pred.df <- data.frame(rf.pred = test.rf, boost.pred = test.boost, knn.pred = test.knn)
-pred.df$agree <- with(pred.df, rf.pred == boost.pred && rf.pred == knn.pred)
-all.agree <- all(pred.df$agree)
 pred.df
 ```
+
+### Conclusion
+The selected final model - Random Forest had an accuracy of 0.994 and out of sample error of 0.006, thus we would expect this model to make accurate predictions using the test set. Specifically for our test data of sample size n=20, we would expect out-of-sample error to be near zero (since 0.006 x 20 = 0.12).  Indeed the submission of the Random Forest model predictions on the test quiz data yielded all correct predictions.

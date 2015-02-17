@@ -52,34 +52,268 @@ if (window.hljs && document.readyState && document.readyState === "complete") {
 
 
 
-<div id="read-training-data" class="section level1">
-<h1>Read training data</h1>
-<pre class="r"><code>pml.training &lt;- read.csv(&quot;~/desktop/coursera/Machine_Learning/pml-training.csv&quot;)
-pml.testing &lt;- read.csv(&quot;~/desktop/coursera/Machine_Learning/pml-testing.csv&quot;)</code></pre>
+<div id="practical-machine-learning-course-project" class="section level1">
+<h1>Practical Machine Learning Course Project</h1>
+<p>Ken Cheng</p>
+<p>Feb 17, 2015</p>
+<div id="background" class="section level2">
+<h2>Background</h2>
+<p>In this project, the goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants and predict the manner in which they did the exercise. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: <a href="http://groupware.les.inf.puc-rio.br/har">http://groupware.les.inf.puc-rio.br/har</a> (see the section on the Weight Lifting Exercise Dataset).</p>
 </div>
-<div id="set-seed-and-split-training-set" class="section level1">
-<h1>set seed and split training set</h1>
+<div id="data" class="section level2">
+<h2>Data</h2>
+<p>The training data for this project are available here:</p>
+<p><a href="https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv">https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv</a></p>
+<p>The test data are available here:</p>
+<p><a href="https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv">https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv</a></p>
+<p>The data for this project come from this source: <a href="http://groupware.les.inf.puc-rio.br/har">http://groupware.les.inf.puc-rio.br/har</a>.</p>
+</div>
+<div id="instructions-on-what-to-submit-for-the-project" class="section level2">
+<h2>Instructions on what to submit for the project</h2>
+<p>The goal of your project is to predict the manner in which they did the exercise. This is the “classe” variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases.</p>
+<ol style="list-style-type: decimal">
+<li><p>Your submission should consist of a link to a Github repo with your R markdown and compiled HTML file describing your analysis. Please constrain the text of the writeup to &lt; 2000 words and the number of figures to be less than 5. It will make it easier for the graders if you submit a repo with a gh-pages branch so the HTML page can be viewed online.</p></li>
+<li><p>You should also apply your machine learning algorithm to the 20 test cases available in the test data above. Submit your predictions in appropriate format to the programming assignment for automated grading. See the programming assignment for additional details.</p></li>
+</ol>
+<p><strong>Load training and testing data and replace all missing values with “NA”</strong></p>
+<pre class="r"><code>pml.training &lt;- read.csv(&quot;~/desktop/coursera/Machine_Learning/pml-training.csv&quot;, 
+                         na.strings=c(&quot;NA&quot;, &quot;#DIV/O!&quot;, &quot;&quot;))
+pml.testing &lt;- read.csv(&quot;~/desktop/coursera/Machine_Learning/pml-testing.csv&quot;,
+                        na.strings=c(&quot;NA&quot;, &quot;#DIV/O!&quot;, &quot;&quot;))</code></pre>
+<p><strong>Remove the first 7 variables (column 1 to 7) which are not predictor variables</strong></p>
+<pre class="r"><code>pml.training &lt;- pml.training[,-c(1:7)]
+pml.testing  &lt;- pml.testing[, -c(1:7)]</code></pre>
+<p><strong>Identify and remove columns with missing values</strong></p>
+<pre class="r"><code>pml.training &lt;- pml.training[, colSums(is.na(pml.training)) == 0]
+pml.testing  &lt;- pml.testing[, colSums(is.na(pml.testing))  == 0]</code></pre>
+<p><strong>Load packages</strong></p>
 <pre class="r"><code>library(caret)</code></pre>
 <pre><code>## Loading required package: lattice
 ## Loading required package: ggplot2</code></pre>
-<pre class="r"><code>set.seed(1000)
+<pre class="r"><code>library(randomForest)</code></pre>
+<pre><code>## randomForest 4.6-10
+## Type rfNews() to see new features/changes/bug fixes.</code></pre>
+<pre class="r"><code>library(gbm)</code></pre>
+<pre><code>## Loading required package: survival
+## Loading required package: splines
+## 
+## Attaching package: 'survival'
+## 
+## The following object is masked from 'package:caret':
+## 
+##     cluster
+## 
+## Loading required package: parallel
+## Loaded gbm 2.1</code></pre>
+<p><strong>Partition pml.training data for training and cross-validation</strong></p>
+<pre class="r"><code>set.seed(1234)
 inTrain &lt;- createDataPartition(y=pml.training$classe, p=0.75, list=FALSE)
-training &lt;- pml.training[inTrain, ]
-testing &lt;- pml.training[-inTrain, ]</code></pre>
+trainingsub &lt;- pml.training[inTrain, ]
+testingsub &lt;- pml.training[-inTrain, ]</code></pre>
+<p><strong>Use and compare 4 different models learned in class: Decision Tree, Random Forest, Boosting and K-Nearest Neighborhood</strong></p>
+<p>Prediction Model Using Decision Tree : modelDT</p>
+<pre class="r"><code>modelDT &lt;- train(classe ~., data=trainingsub, method = &quot;rpart&quot;)</code></pre>
+<pre><code>## Loading required package: rpart</code></pre>
+<pre class="r"><code>predDT  &lt;- predict(modelDT, testingsub)
+cmDT    &lt;- confusionMatrix(predDT, data=testingsub$classe)</code></pre>
+<p>The confusion matrix for Decision Tree Model</p>
+<pre><code>## Confusion Matrix and Statistics
+## 
+##           Reference
+## Prediction    A    B    C    D    E
+##          A 1275   28   88    0    4
+##          B  390  340  219    0    0
+##          C  416   31  408    0    0
+##          D  356  141  307    0    0
+##          E  134  131  230    0  406
+## 
+## Overall Statistics
+##                                           
+##                Accuracy : 0.4953          
+##                  95% CI : (0.4812, 0.5094)
+##     No Information Rate : 0.5243          
+##     P-Value [Acc &gt; NIR] : 1               
+##                                           
+##                   Kappa : 0.3399          
+##  Mcnemar's Test P-Value : NA              
+## 
+## Statistics by Class:
+## 
+##                      Class: A Class: B Class: C Class: D Class: E
+## Sensitivity            0.4959  0.50671   0.3259       NA  0.99024
+## Specificity            0.9486  0.85613   0.8776   0.8361  0.88985
+## Pos Pred Value         0.9140  0.35827   0.4772       NA  0.45061
+## Neg Pred Value         0.6307  0.91631   0.7916       NA  0.99900
+## Prevalence             0.5243  0.13683   0.2553   0.0000  0.08361
+## Detection Rate         0.2600  0.06933   0.0832   0.0000  0.08279
+## Detection Prevalence   0.2845  0.19352   0.1743   0.1639  0.18373
+## Balanced Accuracy      0.7222  0.68142   0.6017       NA  0.94005</code></pre>
+<p>Prediction Model Using Random Forest : modelRF</p>
+<pre class="r"><code>cvCtrl &lt;- trainControl(method=&quot;cv&quot;, number = 4, 
+                       allowParallel=TRUE, verboseIter=TRUE)
+modelRF &lt;- train(classe ~., data=trainingsub, method = &quot;rf&quot;, trControl = cvCtrl)
+predRF  &lt;- predict(modelRF, testingsub)
+cmRF    &lt;- confusionMatrix(predRF, data=testingsub$classe)</code></pre>
+<p>The confusion matrix for Random Tree Model</p>
+<pre><code>## Confusion Matrix and Statistics
+## 
+##           Reference
+## Prediction    A    B    C    D    E
+##          A 1395    0    0    0    0
+##          B    7  939    3    0    0
+##          C    0    8  845    2    0
+##          D    0    1    8  794    1
+##          E    0    0    1    0  900
+## 
+## Overall Statistics
+##                                          
+##                Accuracy : 0.9937         
+##                  95% CI : (0.991, 0.9957)
+##     No Information Rate : 0.2859         
+##     P-Value [Acc &gt; NIR] : &lt; 2.2e-16      
+##                                          
+##                   Kappa : 0.992          
+##  Mcnemar's Test P-Value : NA             
+## 
+## Statistics by Class:
+## 
+##                      Class: A Class: B Class: C Class: D Class: E
+## Sensitivity            0.9950   0.9905   0.9860   0.9975   0.9989
+## Specificity            1.0000   0.9975   0.9975   0.9976   0.9998
+## Pos Pred Value         1.0000   0.9895   0.9883   0.9876   0.9989
+## Neg Pred Value         0.9980   0.9977   0.9970   0.9995   0.9998
+## Prevalence             0.2859   0.1933   0.1748   0.1623   0.1837
+## Detection Rate         0.2845   0.1915   0.1723   0.1619   0.1835
+## Detection Prevalence   0.2845   0.1935   0.1743   0.1639   0.1837
+## Balanced Accuracy      0.9975   0.9940   0.9918   0.9975   0.9993</code></pre>
+<p>Prediction Model Using Boosting : modelBoost</p>
+<pre class="r"><code>modelBoost &lt;- train(classe ~., data=trainingsub, method = &quot;gbm&quot;)</code></pre>
+<pre><code>## Loading required package: plyr</code></pre>
+<pre class="r"><code>predBoost  &lt;- predict(modelBoost, testingsub)
+cmBoost    &lt;- confusionMatrix(predBoost, data=testingsub$classe)</code></pre>
+<p>The confusion matrix for Boosting Model</p>
+<pre><code>## Confusion Matrix and Statistics
+## 
+##           Reference
+## Prediction    A    B    C    D    E
+##          A 1375   12    3    4    1
+##          B   30  902   16    1    0
+##          C    0   35  809    9    2
+##          D    1    3   23  774    3
+##          E    1   16   11    4  869
+## 
+## Overall Statistics
+##                                           
+##                Accuracy : 0.9643          
+##                  95% CI : (0.9587, 0.9693)
+##     No Information Rate : 0.2869          
+##     P-Value [Acc &gt; NIR] : &lt; 2.2e-16       
+##                                           
+##                   Kappa : 0.9548          
+##  Mcnemar's Test P-Value : 3.919e-07       
+## 
+## Statistics by Class:
+## 
+##                      Class: A Class: B Class: C Class: D Class: E
+## Sensitivity            0.9773   0.9318   0.9385   0.9773   0.9931
+## Specificity            0.9943   0.9881   0.9886   0.9927   0.9921
+## Pos Pred Value         0.9857   0.9505   0.9462   0.9627   0.9645
+## Neg Pred Value         0.9909   0.9833   0.9869   0.9956   0.9985
+## Prevalence             0.2869   0.1974   0.1758   0.1615   0.1784
+## Detection Rate         0.2804   0.1839   0.1650   0.1578   0.1772
+## Detection Prevalence   0.2845   0.1935   0.1743   0.1639   0.1837
+## Balanced Accuracy      0.9858   0.9599   0.9636   0.9850   0.9926</code></pre>
+<p>Prediction Model Using K-Nearest Neighbor : modelKNN</p>
+<pre class="r"><code>modelKNN &lt;- train(classe ~., data=trainingsub, method = &quot;knn&quot;, trControl=cvCtrl)
+predKNN  &lt;- predict(modelKNN, testingsub)
+cmKNN    &lt;- confusionMatrix(predKNN, data=testingsub$classe)</code></pre>
+<p>Confusion Matrix for K-Nearest Neighbor Model</p>
+<pre><code>## Confusion Matrix and Statistics
+## 
+##           Reference
+## Prediction    A    B    C    D    E
+##          A 1346   11    9   23    6
+##          B   47  827   24   29   22
+##          C   12   28  781   24   10
+##          D   10    7   48  734    5
+##          E   14   26   21   20  820
+## 
+## Overall Statistics
+##                                           
+##                Accuracy : 0.9192          
+##                  95% CI : (0.9113, 0.9267)
+##     No Information Rate : 0.2914          
+##     P-Value [Acc &gt; NIR] : &lt; 2.2e-16       
+##                                           
+##                   Kappa : 0.8978          
+##  Mcnemar's Test P-Value : 2.514e-10       
+## 
+## Statistics by Class:
+## 
+##                      Class: A Class: B Class: C Class: D Class: E
+## Sensitivity            0.9419   0.9199   0.8845   0.8843   0.9502
+## Specificity            0.9859   0.9695   0.9816   0.9828   0.9800
+## Pos Pred Value         0.9649   0.8714   0.9135   0.9129   0.9101
+## Neg Pred Value         0.9763   0.9818   0.9748   0.9766   0.9893
+## Prevalence             0.2914   0.1833   0.1801   0.1692   0.1760
+## Detection Rate         0.2745   0.1686   0.1593   0.1497   0.1672
+## Detection Prevalence   0.2845   0.1935   0.1743   0.1639   0.1837
+## Balanced Accuracy      0.9639   0.9447   0.9330   0.9336   0.9651</code></pre>
+<p><strong>Extract and compare accuracy of each model on the training data subset</strong></p>
+<pre class="r"><code>accuracytab &lt;- data.frame(Model=c(&quot;Decision Tree&quot;, &quot;Random Forest&quot;, &quot;Boosting&quot;, &quot;KNN&quot;),
+                      Accuracy=c(round(max(head(modelDT$results)$Accuracy),3),
+                                 round(max(head(modelRF$results)$Accuracy),3),
+                                 round(max(head(modelBoost$results)$Accuracy),3),
+                                 round(max(head(modelKNN$results)$Accuracy), 3)))</code></pre>
+<p>The table below summarizes the accuracy of the 4 models applied on the training data subset. The Random Forest model has the highest accuracy at 0.991 and out-of-sample error at 0.009. The Decision Tree model shows the lowest accuracy at 0.521 and out-of-sample error at 0.479. The next step would be to compare how well these models perform in the cross validation using the testing data subset.</p>
+<pre><code>##           Model Accuracy
+## 1 Decision Tree    0.521
+## 2 Random Forest    0.991
+## 3      Boosting    0.938
+## 4           KNN    0.887</code></pre>
+<p><strong>Extract and compare accuracy of prediction by each model on the testing data subset</strong></p>
+<pre class="r"><code>accuracypred &lt;- data.frame(Model=c(&quot;Decision Tree&quot;, &quot;Random Forest&quot;, &quot;Boosting&quot;, &quot;KNN&quot;),
+                      Accuracy=c(round((cmDT$overall)[1],3),
+                                 round((cmRF$overall)[1],3),
+                                 round((cmBoost$overall)[1],3),
+                                 round((cmKNN$overall)[1], 3)))</code></pre>
+<p>The table below summarizes the 4 models used for cross-validation using the test data subset and shows that Random Forest provides the best prediction with Accuracy of 0.994 and thus out-of-sample error is equal to 0.006 while the Decision Tree model had the lowest prediction Accuracy at 0.495 and highest out-of-sample error at 0.505. Hence the Random Forest model was selected as the final model and applied on test quiz data for our prediction submission.</p>
+<pre><code>##           Model Accuracy
+## 1 Decision Tree    0.495
+## 2 Random Forest    0.994
+## 3      Boosting    0.964
+## 4           KNN    0.919</code></pre>
+<p>The table below summarizes the predictions using our final model (Random Forest) on the test quiz data. As a comparison, the next two best models (Boosting and KNN) based on cross-validation results were also used on the test quiz data. Interestingly, the predictions using the Random Forest, Boosting and KNN gave identical results. The identical prediction results were not surprising as these models had quite similar Accuracy in the cross-validation predictions.</p>
+<pre class="r"><code>test.rf    &lt;- predict(modelRF, pml.testing)
+test.boost &lt;- predict(modelBoost, pml.testing)
+test.knn   &lt;- predict(modelKNN, pml.testing)
+pred.df &lt;- data.frame(rf.pred = test.rf, boost.pred = test.boost, knn.pred = test.knn)
+pred.df</code></pre>
+<pre><code>##    rf.pred boost.pred knn.pred
+## 1        B          B        B
+## 2        A          A        A
+## 3        B          B        B
+## 4        A          A        A
+## 5        A          A        A
+## 6        E          E        E
+## 7        D          D        D
+## 8        B          B        B
+## 9        A          A        A
+## 10       A          A        A
+## 11       B          B        B
+## 12       C          C        C
+## 13       B          B        B
+## 14       A          A        A
+## 15       E          E        E
+## 16       E          E        E
+## 17       A          A        A
+## 18       B          B        B
+## 19       B          B        B
+## 20       B          B        B</code></pre>
+<div id="conclusion" class="section level3">
+<h3>Conclusion</h3>
+<p>The selected final model - Random Forest had an accuracy of 0.994 and out of sample error of 0.006, thus we would expect this model to make accurate predictions using the test set. Specifically for our test data of sample size n=20, we would expect out-of-sample error to be near zero (since 0.006 x 20 = 0.12). Indeed the submission of the Random Forest model predictions on the test quiz data yielded all correct predictions.</p>
 </div>
-<div id="data-cleaning-and-processing" class="section level1">
-<h1>data cleaning and processing</h1>
-<pre class="r"><code>dim(training)</code></pre>
-<pre><code>## [1] 14718   160</code></pre>
-</div>
-<div id="trim-down-data-set-which-contains-19622-observations-and-160-variables" class="section level1">
-<h1>Trim down data set which contains 19622 observations and 160 variables</h1>
-<pre class="r"><code>clean.data &lt;- training[, -(1:7)]</code></pre>
-<div id="reduce-cols-which-exceed-threshoold-over-95-of-nas-or" class="section level2">
-<h2>reduce cols which exceed threshoold over 95% of NAs or “”</h2>
-<pre class="r"><code>thres &lt;- nrow(clean.data) * 0.95  
-nNaColumns &lt;- !apply(clean.data, 2, function(x) sum(is.na(x)) &gt; thres  || sum(x==&quot;&quot;) &gt; thres)
-clean.data &lt;- clean.data[, nNaColumns]</code></pre>
 </div>
 </div>
 
