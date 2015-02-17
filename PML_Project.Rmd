@@ -1,0 +1,102 @@
+# Machine Learning Project
+output: html_document
+---
+# Load training and testing data and replace all missing values with "NA"
+```{r}
+pml.training <- read.csv("~/desktop/coursera/Machine_Learning/pml-training.csv", 
+                         na.strings=c("NA", "#DIV/O!", ""))
+pml.testing <- read.csv("~/desktop/coursera/Machine_Learning/pml-testing.csv",
+                        na.strings=c("NA", "#DIV/O!", ""))
+```
+
+# Remove the first 7 variables (column 1 to 7) which are not predictor variables
+```{r}
+pml.training <- pml.training[,-c(1:7)]
+pml.testing  <- pml.testing[, -c(1:7)]
+```
+
+# Identify and remove columns with missing values
+```{r}
+# index_columns <- colnames(pml.training[colSums(is.na(pml.training)) == 0])
+# pml.training <- pml.training[, index_columns]
+# pml.testing  <- pml.testing[, index_columns]
+
+pml.training <- pml.training[, colSums(is.na(pml.training)) == 0]
+pml.testing  <- pml.testing[, colSums(is.na(pml.testing))  == 0]
+```
+# Load packages and partition training data subset for cross-validation
+```{r}
+library(caret)
+library(randomForest)
+library(gbm)
+library(plyr)
+set.seed(1234)
+inTrain <- createDataPartition(y=pml.training$classe, p=0.75, list=FALSE)
+trainingsub <- pml.training[inTrain, ]
+testingsub <- pml.training[-inTrain, ]
+```
+
+# Prediction Model Using Decision Tree : modelDT
+```{r}
+modelDT <- train(classe ~., data=trainingsub, method = "rpart")
+predDT  <- predict(modelDT, testingsub)
+cmDT    <- confusionMatrix(predDT, data=testingsub$classe)
+cmDT
+```
+
+# Prediction Model Using Random Forest : modelRF
+```{r}
+cvCtrl <- trainControl(method="cv", number = 4, 
+                       allowParallel=TRUE, verboseIter=TRUE)
+modelRF <- train(classe ~., data=trainingsub, method = "rf", trControl = cvCtrl)
+# modelRF <- randomForest(classe ~. , data=trainingsub, method="class")
+predRF  <- predict(modelRF, testingsub)
+cmRF    <- confusionMatrix(predRF, data=testingsub$classe)
+cmRF
+```
+
+# Prediction Model Using Boosting : modelBoost
+```{r}
+modelBoost <- train(classe ~., data=trainingsub, method = "gbm")
+predBoost  <- predict(modelBoost, testingsub)
+cmBoost    <- confusionMatrix(predBoost, data=testingsub$classe)
+cmBoost
+```
+
+# Prediction Model Using K-Nearest Neighbor : modelKNN
+```{r}
+modelKNN <- train(classe ~., data=trainingsub, method = "knn", trControl=cvCtrl)
+predKNN  <- predict(modelKNN, testingsub)
+cmKNN    <- confusionMatrix(predKNN, data=testingsub$classe)
+cmKNN
+```
+```{r}
+accuracytab <- data.frame(Model=c("Decision Tree", "Random Forest", "Boosting", "KNN"),
+                      Accuracy=c(round(max(head(modelDT$results)$Accuracy),3),
+                                 round(max(head(modelRF$results)$Accuracy),3),
+                                 round(max(head(modelBoost$results)$Accuracy),3),
+                                 round(max(head(modelKNN$results)$Accuracy), 3)))
+```
+# Show the accuracy of the four models and select model with highest accuracy
+```{r}
+accuracytab
+```
+# Extract and compare the accuracy of prediction by each model on the testing subset
+```{r}
+accuracypred <- data.frame(Model=c("Decision Tree", "Random Forest", "Boosting", "KNN"),
+                      Accuracy=c(round((cmDT$overall)[1],3),
+                                 round((cmRF$overall)[1],3),
+                                 round((cmBoost$overall)[1],3),
+                                 round((cmKNN$overall)[1], 3)))
+accuracypred
+```
+# Apply models on the test quiz data
+```{r}
+test.rf    <- predict(modelRF, pml.testing)
+test.boost <- predict(modelBoost, pml.testing)
+test.knn   <- predict(modelKNN, pml.testing)
+pred.df <- data.frame(rf.pred = test.rf, boost.pred = test.boost, knn.pred = test.knn)
+pred.df$agree <- with(pred.df, rf.pred == boost.pred && rf.pred == knn.pred)
+all.agree <- all(pred.df$agree)
+pred.df
+```
